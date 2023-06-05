@@ -4,6 +4,7 @@ const cors = require("cors");
 const dotenv = require("dotenv");
 
 const app = express();
+const port = process.env.PORT || 3000;
 
 dotenv.config();
 
@@ -78,6 +79,6 @@ app.all("/*", (req, res) => {
     });
 });
 
-app.listen(3000, () => {
-    console.log("Listening on port http://localhost:3000");
+app.listen(Number(port), "0.0.0.0", () => {
+    console.log(`Listening on port http://localhost:${port}`);
 });
