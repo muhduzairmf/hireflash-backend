@@ -1,0 +1,197 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Candidate_Profile {
+  id String @id
+  gender String 
+  location String
+  date_of_birth String
+  nationality String
+  preferred_salary String?
+  about String?
+  user_id String @unique
+  user User @relation(fields: [user_id], references: [id])
+  education Education[]
+  lang_ability Lang_Ability[]
+  resume Resume[]
+  skill Skill[]
+  work_experience Work_Experience[]
+  applicant Applicant[]
+  shortlisted_candidate Shortlisted_Candidate[]
+  successful_candidate Successful_Candidate[]
+}
+
+model Company {
+  id String @id
+  name String
+  website String @unique
+  desc String
+  address_line1 String
+  address_line2 String?
+  postal_code String
+  state String
+  city String
+  country String
+  pic String?
+  officer Officer[]
+  job Job[]
+}
+
+model Education {
+  id String @id
+  graduation_date String
+  qualification String
+  institute_name String
+  institute_address String
+  study_field String
+  grade String
+  candidate_profile_id String
+  candidate_profile Candidate_Profile @relation(fields: [candidate_profile_id], references: [id])
+}
+
+model Job {
+  id String @id
+  designation String
+  department String
+  min_monthly_salary Float
+  max_monthly_salary Float
+  candidate_nationality String
+  candidate_min_edu_level String
+  candidate_min_of_exp String
+  candidate_lang_req String
+  candidate_other_req String?
+  job_responsibilities String
+  other_info String?
+  created_date String
+  last_modified_date String
+  recruitment_status String
+  job_type String
+  job_field String
+  company_id String
+  company Company @relation(fields: [company_id], references: [id])
+  applicant Applicant[]
+  shortlisted_candidate Shortlisted_Candidate[]
+  successful_candidate Successful_Candidate[]
+}
+
+model Lang_Ability {
+  id String @id
+  language_name String
+  scale_of_writing String
+  scale_of_speaking String
+  candidate_profile_id String
+  candidate_profile Candidate_Profile @relation(fields: [candidate_profile_id], references: [id])
+}
+
+model Message {
+  id String @id
+  content String
+  is_read Boolean
+  created_date String
+  recipient_id String
+  sender_id String
+  sender User @relation(fields: [sender_id], references: [id])
+}
+
+model Notification {
+  id String @id
+  content String
+  category String
+  is_read Boolean
+  user_id String
+  user User @relation(fields: [user_id], references: [id])
+}
+
+model Officer {
+  id String @id
+  position String
+  is_resigned Boolean
+  user_id String @unique
+  user User @relation(fields: [user_id], references: [id])
+  company_id String
+  company Company @relation(fields: [company_id], references: [id])
+}
+
+model Resume {
+  id String @id
+  path String
+  candidate_profile_id String  
+  candidate_profile Candidate_Profile @relation(fields: [candidate_profile_id], references: [id])
+}
+
+model Shortlisted_Candidate {
+  id String @id
+  notes String?
+  is_qualified_interview Boolean
+  interview_datetime String?
+  interview_platform String?
+  candidate_profile_id String
+  candidate_profile Candidate_Profile @relation(fields: [candidate_profile_id], references: [id])
+  job_id String
+  job Job @relation(fields: [job_id], references: [id])
+}
+
+model Skill {
+  id String @id
+  skill_name String
+  proficiency String
+  candidate_profile_id String
+  candidate_profile Candidate_Profile @relation(fields: [candidate_profile_id], references: [id])
+}
+
+model Applicant {
+  id String @id
+  notes String?
+  is_only_wish Boolean
+  is_viewed Boolean
+  candidate_profile_id String
+  candidate_profile Candidate_Profile @relation(fields: [candidate_profile_id], references: [id])
+  job_id String
+  job Job @relation(fields: [job_id], references: [id])
+}
+
+model Successful_Candidate {
+  id String @id
+  notes String?
+  monthly_salary Float
+  confirmation_status String
+  candidate_profile_id String
+  candidate_profile Candidate_Profile @relation(fields: [candidate_profile_id], references: [id])
+  job_id String
+  job Job @relation(fields: [job_id], references: [id])
+}
+
+model Work_Experience {
+  id String @id
+  position String
+  start_date String
+  end_date String
+  duration String
+  company_name String
+  company_address String
+  monthly_salary Float
+  candidate_profile_id String 
+  candidate_profile Candidate_Profile @relation(fields: [candidate_profile_id], references: [id])
+}
+
+model User {
+  id String @id
+  name String
+  email String @unique
+  password String
+  role String
+  pic String?
+  message Message[]
+  notification Notification[]
+  officer Officer?
+  candidate_profile Candidate_Profile?
+}
