@@ -3,7 +3,10 @@
 const router = require("express").Router();
 
 // Import redis
-// const Redis = require("redis");
+const Redis = require("redis");
+
+// Import nodemailer
+const nodemailer = require("nodemailer");
 
 // Import crypto modules to hash and salt a password, used for signup and login
 const {
@@ -26,7 +29,7 @@ const { PrismaClient } = require("@prisma/client");
 const checkToken = require("../middlewares/checkToken");
 
 // Instantiate new Redis client
-// const redisClient = Redis.createClient({ url: process.env.REDIS_URL })
+const redisClient = Redis.createClient({ url: process.env.REDIS_URL });
 
 // Instantiate new prisma client
 const prisma = new PrismaClient();
@@ -56,8 +59,15 @@ function generateOTP(length) {
 
 // 1- POST /api/auth/signup
 router.post("/signup", async (req, res) => {
-    const { fullname, email, password, confirmpassword, inviteToken, role_id } =
-        req.body;
+    const {
+        fullname,
+        email,
+        password,
+        confirmpassword,
+        inv_id,
+        inviteToken,
+        role_id,
+    } = req.body;
 
     // Check if the variables is empty
     if (
@@ -133,26 +143,30 @@ router.post("/signup", async (req, res) => {
     const hashedPassword = scryptSync(password, salt, 64).toString("hex");
 
     // Check if the invite token exists (for sign up new officer) in redis cache
+    redisClient.connect();
 
-    let officer_role = "";
+    // let officer_role = "";
     // The response if the invite token is invalid
-    if (!notContainsValue(inviteToken) && inviteToken !== "abc123") {
-        res.status(400).json({
-            endpoint: req.originalUrl,
-            status: "400 - Bad Request",
-            message: "Invite token is invalid.",
-        });
-        return;
-    } else {
-        // TEST MODE ONLY
-        if (role_id === "111111") {
-            officer_role = "manager";
-        } else if (role_id === "222222") {
-            officer_role = "hr";
-        } else if (role_id === "333333") {
-            officer_role = "guest";
+    if (!notContainsValue(inv_id) && !notContainsValue(inviteToken)) {
+        const saved_inviteToken = await redisClient.get(inv_id);
+
+        if (!saved_inviteToken || inviteToken !== saved_inviteToken) {
+            res.status(400).json({
+                endpoint: req.originalUrl,
+                status: "400 - Bad Request",
+                message: "Invite token is invalid.",
+            });
+            return;
         }
     }
+
+    let officer_role = "";
+
+    if (role_id) {
+        officer_role = await redisClient.get(role_id);
+    }
+
+    redisClient.quit();
 
     // Store the new user information, for password save ${salt}.${hashedPassword}
     const newUser = await prisma.user.create({
@@ -161,7 +175,7 @@ router.post("/signup", async (req, res) => {
             email: email,
             name: fullname,
             password: `${salt}.${hashedPassword}`,
-            role: notContainsValue(inviteToken) ? "applicant" : officer_role,
+            role: role_id && officer_role ? officer_role : "applicant",
         },
     });
 
@@ -497,6 +511,8 @@ router.post("/link", async (req, res) => {
         },
     });
 
+    console.log(await prisma.company.findMany());
+
     // The response of the company is not exists
     if (!companyExists) {
         res.status(404).json({
@@ -511,27 +527,53 @@ router.post("/link", async (req, res) => {
     const inv_id = randomUUID();
 
     // Generate the invite token as a value, hash the email to generate it
-    // const inviteToken = createHash("sha256").update(email).digest("hex");
-    const inviteToken = "abc123";
+    const inviteToken = createHash("sha256").update(email).digest("hex");
+    // const inviteToken = "abc123";
 
     // Store at redis cache as
+    redisClient.connect();
+
+    try {
+        redisClient.setEx(inv_id, 3600, inviteToken);
+    } catch (error) {
+        // The response of otp cannot be stored
+        res.status(500).json({
+            endpoint: req.originalUrl,
+            status: "500 - Internal Server Error",
+            message: "Invite token cannot be created due to internal error.",
+        });
+        return;
+    }
 
     // Generate the id as a key
-    // const role_id = randomUUID();
+    const role_id = randomUUID();
 
     // TEST MODE ONLY
-    let role_id = "";
-    if (role === "manager") {
-        role_id = "111111";
-    } else if (role === "hr") {
-        role_id = "222222";
-    } else if (role === "guest") {
-        role_id = "333333";
-    }
+    // let role_id = "";
+    // if (role === "manager") {
+    //     role_id = "111111";
+    // } else if (role === "hr") {
+    //     role_id = "222222";
+    // } else if (role === "guest") {
+    //     role_id = "333333";
+    // }
 
     // Generate
 
     // Store the role as a value in redis cache
+    try {
+        redisClient.setEx(role_id, 3600, role);
+    } catch (error) {
+        // The response of otp cannot be stored
+        res.status(500).json({
+            endpoint: req.originalUrl,
+            status: "500 - Internal Server Error",
+            message: "Invite token cannot be created due to internal error.",
+        });
+        return;
+    }
+
+    redisClient.quit();
 
     // The response invite token cannot be stored
     // if (!false) {
@@ -553,7 +595,9 @@ router.post("/link", async (req, res) => {
             status: "201 - Created",
             message: "A sign up link for the officer successfully created.",
             data: {
-                link: `http://localhost:5173/auth/signup?access=${junk1}&link=${junk2}&invite=${company_id}&email=${encodeURIComponent(
+                link: `${
+                    process.env.FRONTEND_BASEURL
+                }/auth/signup?access=${junk1}&link=${junk2}&invite=${company_id}&email=${encodeURIComponent(
                     email
                 )}&key=${inv_id}&token=${inviteToken}&role=${role_id}`,
             },
@@ -562,6 +606,32 @@ router.post("/link", async (req, res) => {
     }
 
     // Use nodemailer to send email
+    // let transporter = nodemailer.createTransport({
+    //     host: process.env.EMAIL_SENDER_HOST, // SMTP server address (usually mail.your-domain.com)
+    //     port: parseInt(process.env.EMAIL_SENDER_PORT), // Port for SMTP
+    //     secure: true, // Usually true
+    //     auth: {
+    //         user: process.env.EMAIL_SENDER_USER, // Your email address
+    //         pass: process.env.EMAIL_SENDER_PASS, // Password
+    //     },
+    // });
+
+    // let info = await transporter.sendMail({
+    //     from: `"You" <${process.env.EMAIL_SENDER_USER}>`,
+    //     to: email,
+    //     subject: `Hireflash | Invitation link to join ${companyExists.name}`,
+    //     html: `
+    //     <p>Admin has sent this link to invite you to join ${
+    //         companyExists.name
+    //     } in Hireflash platform. <a href="${
+    //         process.env.FRONTEND_BASEURL
+    //     }/auth/signup?access=${junk1}&link=${junk2}&invite=${company_id}&email=${encodeURIComponent(
+    //         email
+    //     )}&key=${inv_id}&token=${inviteToken}&role=${role_id}" target="_blank">Click here to continue.</a>. Please ignore if this email not really meant for you.</p>
+    // `,
+    // });
+
+    console.log(info);
 
     // The response if the email unsuccessfully sent
 
@@ -617,6 +687,36 @@ router.post("/get-started/email", async (req, res) => {
     const verificationCode = generateOTP(6);
 
     // Send the otp to the email
+    // try {
+    //     // Use nodemailer to send email
+    //     let transporter = nodemailer.createTransport({
+    //         host: process.env.EMAIL_SENDER_HOST, // SMTP server address (usually mail.your-domain.com)
+    //         port: parseInt(process.env.EMAIL_SENDER_PORT), // Port for SMTP
+    //         secure: true, // Usually true
+    //         auth: {
+    //             user: process.env.EMAIL_SENDER_USER, // Your email address
+    //             pass: process.env.EMAIL_SENDER_PASS, // Password
+    //         },
+    //     });
+
+    //     let info = await transporter.sendMail({
+    //         from: `"You" <${process.env.EMAIL_SENDER_USER}>`,
+    //         to: email,
+    //         subject: `Hireflash | Code Verification`,
+    //         html: `
+    //     <p>Your code verifaction for creating new organization is ${verificationCode}</p>
+    // `,
+    //     });
+
+    //     console.log(info);
+    // } catch (error) {
+    //     res.status(500).json({
+    //         endpoint: req.originalUrl,
+    //         status: "500 - Internal Server Error",
+    //         message: `${error}`,
+    //     });
+    //     return;
+    // }
 
     // The response if the otp failed to send
     // if (!false) {
@@ -630,6 +730,23 @@ router.post("/get-started/email", async (req, res) => {
 
     // Store otp at redis cache
     const verifyId = randomUUID();
+
+    redisClient.connect();
+
+    try {
+        redisClient.setEx(verifyId, 3600, verificationCode);
+    } catch (error) {
+        // The response of otp cannot be stored
+        res.status(500).json({
+            endpoint: req.originalUrl,
+            status: "500 - Internal Server Error",
+            message:
+                "Verification code cannot be created due to internal error.",
+        });
+        return;
+    }
+
+    redisClient.quit();
 
     // The response of otp cannot be stored
     // if (!false) {
@@ -678,7 +795,10 @@ router.post("/get-started/verify", async (req, res) => {
         return;
     }
 
+    redisClient.connect();
+
     // Check if the verification code same as stored in redis
+    const code = await redisClient.get(id);
 
     // The response if the verification code is not matched
     // if (!false) {
@@ -690,7 +810,28 @@ router.post("/get-started/verify", async (req, res) => {
     //     return;
     // }
 
+    if (!code) {
+        res.status(404).json({
+            endpoint: req.originalUrl,
+            status: "404 - Not Found",
+            message: "Verification code is not found.",
+        });
+        return;
+    }
+
+    if (code !== verificationCode) {
+        res.status(400).json({
+            endpoint: req.originalUrl,
+            status: "400 - Bad Request",
+            message: "Verification code is incorrect.",
+        });
+        return;
+    }
+
     // Delete the key and value of otp, if it is matched
+    redisClient.del(id);
+
+    redisClient.quit();
 
     res.status(200).json({
         endpoint: req.originalUrl,
@@ -757,16 +898,22 @@ router.post("/forgot-password", async (req, res) => {
     // Store otp at redis cache
     const verifyId = randomUUID();
 
-    // The response of otp cannot be stored
-    // if (!false) {
-    //     res.status(500).json({
-    //         endpoint: req.originalUrl,
-    //         status: "500 - Internal Server Error",
-    //         message:
-    //             "Verification code cannot be created due to internal error.",
-    //     });
-    //     return;
-    // }
+    redisClient.connect();
+
+    try {
+        redisClient.setEx(verifyId, 3600, verificationCode);
+    } catch (error) {
+        // The response of otp cannot be stored
+        res.status(500).json({
+            endpoint: req.originalUrl,
+            status: "500 - Internal Server Error",
+            message:
+                "Verification code cannot be created due to internal error.",
+        });
+        return;
+    }
+
+    redisClient.quit();
 
     res.status(200).json({
         endpoint: req.originalUrl,
@@ -804,19 +951,43 @@ router.post("/forgot-password/verify", async (req, res) => {
         return;
     }
 
-    // Check if the verification code same as stored in redis
+    redisClient.connect();
 
-    // The response if the verification code is not matched
-    // if (!false) {
-    //     res.status(400).json({
+    // Check if the verification code same as stored in redis
+    const code = await redisClient.get(id);
+
+    // if (error) {
+    //     res.status(500).json({
     //         endpoint: req.originalUrl,
-    //         status: "400 - Bad Request",
-    //         message: "Verification code is incorrect.",
+    //         status: "500 - Internal Server Error",
+    //         message:
+    //             "Verification code cannot be retrieved due to internal error.",
     //     });
     //     return;
     // }
 
+    if (!code) {
+        res.status(404).json({
+            endpoint: req.originalUrl,
+            status: "404 - Not Found",
+            message: "Verification code is not found.",
+        });
+        return;
+    }
+
+    if (code !== verificationCode) {
+        res.status(400).json({
+            endpoint: req.originalUrl,
+            status: "400 - Bad Request",
+            message: "Verification code is incorrect.",
+        });
+        return;
+    }
+
     // Delete the key and value of otp, if it is matched
+    redisClient.del(id);
+
+    redisClient.quit();
 
     res.status(200).json({
         endpoint: req.originalUrl,

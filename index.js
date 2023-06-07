@@ -38,17 +38,17 @@ HTTP Status Code
 */
 
 // Uncomment this only for development purposes
-// app.use((req, res, next) => {
-//     console.log(
-//         `[${new Date().getDate()}/${new Date().getMonth()}/${new Date().getFullYear()} ${new Date().getHours()}:${new Date().getMinutes()}:${new Date().getSeconds()}:${new Date().getMilliseconds()}] ${
-//             req.method
-//         } ${req.originalUrl}`
-//     );
-//     console.log(req.body);
-//     console.log("***************************************************");
+app.use((req, res, next) => {
+    console.log(
+        `[${new Date().getDate()}/${new Date().getMonth()}/${new Date().getFullYear()} ${new Date().getHours()}:${new Date().getMinutes()}:${new Date().getSeconds()}:${new Date().getMilliseconds()}] ${
+            req.method
+        } ${req.originalUrl}`
+    );
+    console.log(req.body);
+    console.log("***************************************************");
 
-//     next();
-// });
+    next();
+});
 
 // app.get("/test-cookie", (req, res) => {
 //     res.cookie("helloworld", "helloworld", { sameSite: "none", secure: true });
