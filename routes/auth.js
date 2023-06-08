@@ -631,8 +631,6 @@ router.post("/link", async (req, res) => {
     // `,
     // });
 
-    console.log(info);
-
     // The response if the email unsuccessfully sent
 
     res.status(201).json({
@@ -736,6 +734,8 @@ router.post("/get-started/email", async (req, res) => {
     try {
         redisClient.setEx(verifyId, 3600, verificationCode);
     } catch (error) {
+        redisClient.quit();
+
         // The response of otp cannot be stored
         res.status(500).json({
             endpoint: req.originalUrl,
@@ -811,6 +811,8 @@ router.post("/get-started/verify", async (req, res) => {
     // }
 
     if (!code) {
+        redisClient.quit();
+
         res.status(404).json({
             endpoint: req.originalUrl,
             status: "404 - Not Found",
@@ -820,6 +822,8 @@ router.post("/get-started/verify", async (req, res) => {
     }
 
     if (code !== verificationCode) {
+        redisClient.quit();
+
         res.status(400).json({
             endpoint: req.originalUrl,
             status: "400 - Bad Request",
@@ -903,6 +907,8 @@ router.post("/forgot-password", async (req, res) => {
     try {
         redisClient.setEx(verifyId, 3600, verificationCode);
     } catch (error) {
+        redisClient.quit();
+
         // The response of otp cannot be stored
         res.status(500).json({
             endpoint: req.originalUrl,
@@ -967,6 +973,8 @@ router.post("/forgot-password/verify", async (req, res) => {
     // }
 
     if (!code) {
+        redisClient.quit();
+
         res.status(404).json({
             endpoint: req.originalUrl,
             status: "404 - Not Found",
@@ -976,6 +984,8 @@ router.post("/forgot-password/verify", async (req, res) => {
     }
 
     if (code !== verificationCode) {
+        redisClient.quit();
+
         res.status(400).json({
             endpoint: req.originalUrl,
             status: "400 - Bad Request",
