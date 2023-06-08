@@ -134,6 +134,8 @@ model Shortlisted_Candidate {
   is_qualified_interview Boolean
   interview_datetime String?
   interview_platform String?
+  shortlisted_date String?
+  interviewlisted_date String?
   candidate_profile_id String
   candidate_profile Candidate_Profile @relation(fields: [candidate_profile_id], references: [id])
   job_id String
@@ -153,6 +155,7 @@ model Applicant {
   notes String?
   is_only_wish Boolean
   is_viewed Boolean
+  applied_date String?
   candidate_profile_id String
   candidate_profile Candidate_Profile @relation(fields: [candidate_profile_id], references: [id])
   job_id String
@@ -164,6 +167,7 @@ model Successful_Candidate {
   notes String?
   monthly_salary Float
   confirmation_status String
+  added_date String?
   candidate_profile_id String
   candidate_profile Candidate_Profile @relation(fields: [candidate_profile_id], references: [id])
   job_id String
