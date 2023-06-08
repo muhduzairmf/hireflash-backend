@@ -202,6 +202,7 @@ router.get("/:id", async (req, res) => {
 // 3- GET /api/job/company/:company_id
 router.get("/company/:company_id", async (req, res) => {
     const company_id = req.params.company_id;
+    const { status } = req.query;
 
     // Check if the company id is exists
     const companyExists = await prisma.company.findUnique({
@@ -220,16 +221,29 @@ router.get("/company/:company_id", async (req, res) => {
         return;
     }
 
-    // Get the job based on the officer's company id
-    const jobList = await prisma.job.findMany({
-        where: {
-            company_id: company_id,
-            recruitment_status: "Advertised",
-        },
-        include: {
-            company: true,
-        },
-    });
+    let jobList = [];
+    if (status) {
+        // Get the job based on the officer's company id
+        jobList = await prisma.job.findMany({
+            where: {
+                company_id: company_id,
+                recruitment_status: decodeURIComponent(status),
+            },
+            include: {
+                company: true,
+            },
+        });
+    } else {
+        // Get the job based on the officer's company id
+        jobList = await prisma.job.findMany({
+            where: {
+                company_id: company_id,
+            },
+            include: {
+                company: true,
+            },
+        });
+    }
 
     const uniqueField = [...new Set(jobList.map((job) => job.job_field))];
 
