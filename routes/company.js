@@ -5,6 +5,12 @@ const router = require("express").Router();
 // Import crypto modules to generate UUID
 const { randomUUID } = require("crypto");
 
+// Import UploadCare functions
+const {
+    deleteFile,
+    UploadcareSimpleAuthSchema,
+} = require("@uploadcare/rest-client");
+
 // Import PrismaClient
 const { PrismaClient } = require("@prisma/client");
 
@@ -149,7 +155,7 @@ router.patch("/:id", async (req, res) => {
     // Check if the id is exists
     const companyExists = await prisma.company.findUnique({
         where: {
-            website: website,
+            id: id,
         },
     });
 
@@ -159,6 +165,23 @@ router.patch("/:id", async (req, res) => {
             endpoint: req.originalUrl,
             status: "404 - Not Found",
             message: "Company id not found.",
+        });
+        return;
+    }
+    const companyExistsWeb = await prisma.company.findFirst({
+        where: {
+            website: website,
+            id: {
+                not: id,
+            },
+        },
+    });
+
+    if (companyExistsWeb) {
+        res.status(409).json({
+            endpoint: req.originalUrl,
+            status: "409 - Conflict",
+            message: "Website is already exists.",
         });
         return;
     }
@@ -200,7 +223,46 @@ router.patch("/:id", async (req, res) => {
     });
 });
 
-// 4- DELETE /api/company/:id
+// 4- PATCH /api/company/:id/pic
+router.patch("/:id/pic", async (req, res) => {
+    const id = req.params.id;
+    const { path } = req.body;
+
+    // Check if the id is exists
+    const companyExists = await prisma.company.findUnique({
+        where: {
+            id: id,
+        },
+    });
+
+    // The response if the is is not exists
+    if (!companyExists) {
+        res.status(404).json({
+            endpoint: req.originalUrl,
+            status: "404 - Not Found",
+            message: "Company id not found.",
+        });
+        return;
+    }
+
+    const companyUpdatedPic = await prisma.company.update({
+        where: {
+            id: id,
+        },
+        data: {
+            pic: path,
+        },
+    });
+
+    res.status(200).json({
+        endpoint: req.originalUrl,
+        status: "200 - Ok",
+        message: "Logo for company " + id + " successfully updated.",
+        data: companyUpdatedPic,
+    });
+});
+
+// 5- DELETE /api/company/:id
 router.delete("/:id", async (req, res) => {
     const id = req.params.id;
 
@@ -220,6 +282,21 @@ router.delete("/:id", async (req, res) => {
         });
         return;
     }
+
+    const updatedOfficerList = await prisma.officer.updateMany({
+        where: {
+            company_id: id,
+        },
+        data: {
+            company_id: "",
+        },
+    });
+
+    await prisma.job.deleteMany({
+        where: {
+            company_id: id,
+        },
+    });
 
     // Delete company based on id
     await prisma.company.delete({
@@ -241,6 +318,71 @@ router.delete("/:id", async (req, res) => {
         endpoint: req.originalUrl,
         status: "200 - Ok",
         message: "Company " + id + " successfully deleted.",
+    });
+});
+
+// 6- DELETE /api/company/:id/pic
+router.delete("/:id/pic", async (req, res) => {
+    const id = req.params.id;
+
+    // Check if the id is exists
+    const companyExists = await prisma.company.findUnique({
+        where: {
+            id: id,
+        },
+    });
+
+    // The response if the is is not exists
+    if (!companyExists) {
+        res.status(404).json({
+            endpoint: req.originalUrl,
+            status: "404 - Not Found",
+            message: "Company id not found.",
+        });
+        return;
+    }
+
+    const url = companyExists.pic;
+    const idRegex = /\/([0-9a-f-]+)\//;
+    const match = url.match(idRegex);
+
+    if (!match || !match[1]) {
+        res.status(404).json({
+            endpoint: req.originalUrl,
+            status: "404 - Not Found",
+            message: "Uploadcare id not found.",
+        });
+        return;
+    }
+
+    const uploadcareId = match[1];
+
+    const uploadcareSimpleAuthSchema = new UploadcareSimpleAuthSchema({
+        publicKey: process.env.PUBLIC_KEY_UPLOADCARE,
+        secretKey: process.env.SECRET_KEY_UPLOADCARE,
+    });
+
+    const result = await deleteFile(
+        {
+            uuid: uploadcareId,
+        },
+        { authSchema: uploadcareSimpleAuthSchema }
+    );
+
+    const companyDeletedPic = await prisma.company.update({
+        where: {
+            id: id,
+        },
+        data: {
+            pic: "",
+        },
+    });
+
+    res.status(200).json({
+        endpoint: req.originalUrl,
+        status: "200 - Ok",
+        message: "Logo for company " + id + " successfully updated.",
+        data: companyDeletedPic,
     });
 });
 

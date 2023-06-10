@@ -117,8 +117,8 @@ model Officer {
   is_resigned Boolean
   user_id String @unique
   user User @relation(fields: [user_id], references: [id])
-  company_id String
-  company Company @relation(fields: [company_id], references: [id])
+  company_id String?
+  company Company? @relation(fields: [company_id], references: [id])
 }
 
 model Resume {
