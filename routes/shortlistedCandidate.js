@@ -612,7 +612,7 @@ router.patch(
         const job_id = req.params.job_id;
         const candidate_profile_id = req.params.candidate_profile_id;
 
-        const { is_qualified_interview } = req.body;
+        const { interview_datetime, interview_platform } = req.body;
 
         // Check if the job id is exists
         const jobExists = await prisma.job.findUnique({
@@ -672,15 +672,15 @@ router.patch(
             return;
         }
 
-        // Update
+        // Update interview detail
         const updatedInterviewStatusCandidate =
             await prisma.shortlisted_Candidate.update({
                 where: {
                     id: shortlistedCandidateExists.id,
                 },
                 data: {
-                    interview_datetime: "",
-                    interview_platform: "",
+                    interview_datetime: interview_datetime,
+                    interview_platform: interview_platform,
                 },
             });
 
