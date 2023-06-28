@@ -3,3 +3,4 @@ node_modules
 prisma/dev.db-journal
 prisma/dev.db
 prisma/migrations
+dump.rdb
