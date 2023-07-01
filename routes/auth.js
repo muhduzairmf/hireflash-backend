@@ -638,6 +638,13 @@ router.post("/link", async (req, res) => {
         status: "201 - Created",
         message:
             "A sign up link for the officer successfully sent to via email.",
+        data: {
+            link: `${
+                process.env.FRONTEND_BASEURL
+            }/auth/signup?access=${junk1}&link=${junk2}&invite=${company_id}&email=${encodeURIComponent(
+                email
+            )}&key=${inv_id}&token=${inviteToken}&role=${role_id}`,
+        },
     });
 });
 
