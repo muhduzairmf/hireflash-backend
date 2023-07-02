@@ -2,8 +2,16 @@ const express = require("express");
 // const cookieParser = require("cookie-parser");
 const cors = require("cors");
 const dotenv = require("dotenv");
+const { createServer } = require("http");
+const { Server } = require("socket.io");
 
 const app = express();
+const httpServer = createServer(app);
+const io = new Server(httpServer, {
+    cors: {
+        credentials: true,
+    },
+});
 const port = process.env.PORT || 3000;
 
 dotenv.config();
@@ -72,6 +80,13 @@ app.use("/api/successful-candidate", require("./routes/successfulCandidate"));
 app.use("/api/user", require("./routes/user"));
 app.use("/api/work-experience", require("./routes/workExperience"));
 
+// WebSocket connection for real-time messages
+io.on("connection", (socket) => {
+    socket.on("chat", (message) => {
+        io.emit("chat", message);
+    });
+});
+
 app.all("/*", (req, res) => {
     res.status(404).json({
         status: "404 - Not Found",
@@ -79,6 +94,6 @@ app.all("/*", (req, res) => {
     });
 });
 
-app.listen(Number(port), "0.0.0.0", () => {
+httpServer.listen(Number(port), "0.0.0.0", () => {
     console.log(`Listening on port http://localhost:${port}`);
 });
