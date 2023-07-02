@@ -482,7 +482,7 @@ router.patch(
             where: {
                 candidate_profile_id: candidate_profile_id,
                 job_id: job_id,
-                is_only_wish: false,
+                // is_only_wish: false,
             },
         });
 
@@ -683,7 +683,7 @@ router.delete("/wishlist/:candidate_profile_id/:job_id", async (req, res) => {
         where: {
             candidate_profile_id: candidate_profile_id,
             job_id: job_id,
-            is_only_wish: false,
+            is_only_wish: true,
         },
     });
 
